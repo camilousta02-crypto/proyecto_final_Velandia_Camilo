@@ -1,0 +1,497 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyNEuq/5WazcMakkph0Ewn9G",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/camilousta02-crypto/proyecto_final_Velandia_Camilo/blob/main/bloque1_eda/bloque1_eda_Velandia.ipynb%20\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "v1R8i17vZFvt",
+        "outputId": "cc26f399-a774-44e9-b67c-d7e49f148f44"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[2K     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m316.9/316.9 MB\u001b[0m \u001b[31m4.9 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h  Preparing metadata (setup.py) ... \u001b[?25l\u001b[?25hdone\n",
+            "\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m200.5/200.5 kB\u001b[0m \u001b[31m15.4 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h  Building wheel for pyspark (setup.py) ... \u001b[?25l\u001b[?25hdone\n",
+            "\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\n",
+            "dataproc-spark-connect 1.1.0 requires pyspark[connect]~=4.0.0, but you have pyspark 3.5.0 which is incompatible.\u001b[0m\u001b[31m\n",
+            "\u001b[0m✅ Spark versión: 3.5.0\n",
+            "✅ Java instalado y configurado\n"
+          ]
+        }
+      ],
+      "source": [
+        "# ============================================\n",
+        "# CELDA 0: Instalación de dependencias\n",
+        "# ============================================\n",
+        "!apt-get install openjdk-11-jdk-headless -qq > /dev/null\n",
+        "!pip install -q pyspark==3.5.0\n",
+        "!pip install -q findspark\n",
+        "!pip install -q pandas matplotlib seaborn wordcloud scikit-learn transformers datasets\n",
+        "\n",
+        "import findspark\n",
+        "findspark.init()\n",
+        "\n",
+        "from pyspark.sql import SparkSession\n",
+        "import pyspark.sql.functions as F\n",
+        "from pyspark.sql.types import *\n",
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
+        "\n",
+        "# Configurar Spark para Colab\n",
+        "spark = SparkSession.builder \\\n",
+        "    .appName(\"SIPSA_ProyectoFinal\") \\\n",
+        "    .config(\"spark.driver.memory\", \"4g\") \\\n",
+        "    .config(\"spark.executor.memory\", \"4g\") \\\n",
+        "    .getOrCreate()\n",
+        "\n",
+        "print(\"✅ Spark versión:\", spark.version)\n",
+        "print(\"✅ Java instalado y configurado\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "VaVCPwjqc_Mf",
+        "outputId": "a9aff559-b42d-4f4e-f837-b2e6ccf004c5"
+      },
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# CELDA 1: Descargar dataset SIPSA\n",
+        "# ============================================\n",
+        "import urllib.request\n",
+        "import zipfile\n",
+        "import os\n",
+        "\n",
+        "# Crear carpeta de trabajo\n",
+        "!mkdir -p /content/data\n",
+        "\n",
+        "ruta_drive = \"/content/drive/MyDrive/Marchine learning/BaseDatos-SIPSA_P-Mensual-2013_2017/Mensual_2013_2017.csv\"\n",
+        "\n",
+        "# Verificar si existe\n",
+        "import os\n",
+        "if os.path.exists(ruta_drive):\n",
+        "    print(\"✅ Dataset encontrado en Drive\")\n",
+        "    ruta_dataset = ruta_drive\n",
+        "else:\n",
+        "    print(\"⚠️ No encontrado en Drive. Sube el archivo manualmente.\")\n",
+        "    # Subir archivo manualmente\n",
+        "    from google.colab import files\n",
+        "    uploaded = files.upload()\n",
+        "    ruta_dataset = list(uploaded.keys())[0]"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "H7X_hqLHbi6m",
+        "outputId": "67202484-1a2f-47a4-f2d5-50450a14c8eb"
+      },
+      "execution_count": 6,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✅ Dataset encontrado en Drive\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# CELDA CORREGIDA: Cargar dataset SIPSA real\n",
+        "# ============================================\n",
+        "\n",
+        "from pyspark.sql import SparkSession\n",
+        "from pyspark.sql.types import *\n",
+        "from pyspark.sql import functions as F\n",
+        "\n",
+        "# Asegurar que Spark esté iniciado\n",
+        "spark = SparkSession.builder \\\n",
+        "    .appName(\"SIPSA_ProyectoFinal\") \\\n",
+        "    .config(\"spark.driver.memory\", \"4g\") \\\n",
+        "    .getOrCreate()\n",
+        "\n",
+        "# Ruta del archivo (ajusta según dónde lo subiste)\n",
+        "ruta_dataset = \"/content/drive/MyDrive/Marchine learning/BaseDatos-SIPSA_P-Mensual-2013_2017/Mensual_2013_2017.csv\"\n",
+        "\n",
+        "\n",
+        "# ============================================\n",
+        "# PASO 1: Cargar con SEPARADOR ; y codificación correcta\n",
+        "# ============================================\n",
+        "\n",
+        "print(\"=\" * 60)\n",
+        "print(\"CARGA DEL DATASET SIPSA\")\n",
+        "print(\"=\" * 60)\n",
+        "\n",
+        "# El separador real es ; (punto y coma), no , (coma)\n",
+        "df_sipsa = spark.read.csv(\n",
+        "    ruta_dataset,\n",
+        "    header=True,\n",
+        "    inferSchema=True,\n",
+        "    sep=\";\",              # ← CORREGIDO: punto y coma\n",
+        "    encoding=\"ISO-8859-1\", # ← Latin-1 para tildes\n",
+        "    multiLine=True\n",
+        ")\n",
+        "\n",
+        "print(f\"Columnas detectadas: {df_sipsa.columns}\")\n",
+        "print(f\"Total registros: {df_sipsa.count():,}\")\n",
+        "df_sipsa.printSchema()\n",
+        "df_sipsa.show(5, truncate=False)\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "jmLPSAdgtWUF",
+        "outputId": "9d20dbc8-574e-4978-c8f4-1a44df9913da"
+      },
+      "execution_count": 18,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "============================================================\n",
+            "CARGA DEL DATASET SIPSA\n",
+            "============================================================\n",
+            "Columnas detectadas: ['Fecha', 'Grupo', 'Producto', 'Fuente', 'Precio']\n",
+            "Total registros: 281,386\n",
+            "root\n",
+            " |-- Fecha: string (nullable = true)\n",
+            " |-- Grupo: string (nullable = true)\n",
+            " |-- Producto: string (nullable = true)\n",
+            " |-- Fuente: string (nullable = true)\n",
+            " |-- Precio: integer (nullable = true)\n",
+            "\n",
+            "+---------+------+---------------------------+-----------------------------------+------+\n",
+            "|Fecha    |Grupo |Producto                   |Fuente                             |Precio|\n",
+            "+---------+------+---------------------------+-----------------------------------+------+\n",
+            "|1/01/2013|CARNES|Alas de pollo con costillar|Barranquilla, Barranquillita       |3073  |\n",
+            "|1/01/2013|CARNES|Alas de pollo con costillar|Barranquilla, Granabastos          |3067  |\n",
+            "|1/01/2013|CARNES|Alas de pollo con costillar|Bogotá, D.C., Frigorífico Ble Ltda.|2967  |\n",
+            "|1/01/2013|CARNES|Alas de pollo con costillar|Bogotá, D.C., Frigorífico Guadalupe|2560  |\n",
+            "|1/01/2013|CARNES|Alas de pollo con costillar|Cartagena, Bazurto                 |3429  |\n",
+            "+---------+------+---------------------------+-----------------------------------+------+\n",
+            "only showing top 5 rows\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# PASO 2: Verificar codificación (tildes)\n",
+        "# ============================================\n",
+        "\n",
+        "print(\"\\n\" + \"=\" * 60)\n",
+        "print(\"VERIFICACIÓN DE CODIFICACIÓN\")\n",
+        "print(\"=\" * 60)\n",
+        "\n",
+        "muestra = df_sipsa.select(\"Fuente\").distinct().limit(10).collect()\n",
+        "for row in muestra:\n",
+        "    print(f\"  {row['Fuente']}\")\n",
+        "\n",
+        "# Si ves \"Bogot�\" en vez de \"Bogotá\", cambia encoding a \"UTF-8\" en la celda anterior"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "lkpVGoJ7vJ0S",
+        "outputId": "d1b5beb8-bc3e-4d7b-c131-fa09dddf02c7"
+      },
+      "execution_count": 19,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\n",
+            "============================================================\n",
+            "VERIFICACIÓN DE CODIFICACIÓN\n",
+            "============================================================\n",
+            "  Santana (Boyacá)\n",
+            "  Ancuyá (Nariño)\n",
+            "  Bucaramanga, Centroabastos\n",
+            "  Arauca (Arauca)\n",
+            "  Ipiales (Nariño), Ipiales somos todos\n",
+            "  Ipiales (Nariño), Centro de acopio\n",
+            "  Montería, Frigosinú\n",
+            "  Duitama (Boyacá)\n",
+            "  La Ceja (Antioquia)\n",
+            "  Cartago (Valle del Cauca)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# PASO 3: Transformar Fecha y crear variables derivadas\n",
+        "# ============================================\n",
+        "\n",
+        "print(\"\\n\" + \"=\" * 60)\n",
+        "print(\"TRANSFORMACIONES: Fecha → Año, Mes, Día\")\n",
+        "print(\"=\" * 60)\n",
+        "\n",
+        "# Convertir Fecha de String a Date\n",
+        "# Formato en Excel: \"1/01/2013\" → día/mes/año\n",
+        "df_sipsa = df_sipsa.withColumn(\n",
+        "    \"Fecha_Date\",\n",
+        "    F.to_date(F.col(\"Fecha\"), \"d/MM/yyyy\")\n",
+        ")\n",
+        "\n",
+        "# Extraer componentes temporales\n",
+        "df_sipsa = df_sipsa \\\n",
+        "    .withColumn(\"anio\", F.year(\"Fecha_Date\")) \\\n",
+        "    .withColumn(\"mes\", F.month(\"Fecha_Date\")) \\\n",
+        "    .withColumn(\"dia\", F.dayofmonth(\"Fecha_Date\")) \\\n",
+        "    .withColumn(\"trimestre\", F.quarter(\"Fecha_Date\"))\n",
+        "\n",
+        "# Separar Fuente en Ciudad y Lugar\n",
+        "df_sipsa = df_sipsa.withColumn(\n",
+        "    \"Ciudad\",\n",
+        "    F.split(F.col(\"Fuente\"), \",\").getItem(0)\n",
+        ").withColumn(\n",
+        "    \"Lugar\",\n",
+        "    F.trim(F.split(F.col(\"Fuente\"), \",\").getItem(1))\n",
+        ")\n",
+        "\n",
+        "# Mostrar resultado\n",
+        "df_sipsa.select(\n",
+        "    \"Fecha\", \"Fecha_Date\", \"anio\", \"mes\", \"trimestre\",\n",
+        "    \"Grupo\", \"Producto\", \"Ciudad\", \"Lugar\", \"Precio\"\n",
+        ").show(10, truncate=False)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "C_S4Cw4gvP6I",
+        "outputId": "8eca6a2f-a923-4b25-bfb3-5f2a6c18c101"
+      },
+      "execution_count": 20,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\n",
+            "============================================================\n",
+            "TRANSFORMACIONES: Fecha → Año, Mes, Día\n",
+            "============================================================\n",
+            "+---------+----------+----+---+---------+------+---------------------------+-----------------------+-------------------------------------+------+\n",
+            "|Fecha    |Fecha_Date|anio|mes|trimestre|Grupo |Producto                   |Ciudad                 |Lugar                                |Precio|\n",
+            "+---------+----------+----+---+---------+------+---------------------------+-----------------------+-------------------------------------+------+\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Barranquilla           |Barranquillita                       |3073  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Barranquilla           |Granabastos                          |3067  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Bogotá                 |D.C.                                 |2967  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Bogotá                 |D.C.                                 |2560  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Cartagena              |Bazurto                              |3429  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Ibagué                 |Plaza La 21                          |4307  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|\"Medellín              |Plaza Minorista \"\"José María Villa\"\"\"|3717  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Montería               |Mercado del Sur                      |3800  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Sincelejo              |Nuevo Mercado                        |3780  |\n",
+            "|1/01/2013|2013-01-01|2013|1  |1        |CARNES|Alas de pollo con costillar|Tuluá (Valle del Cauca)|NULL                                 |4500  |\n",
+            "+---------+----------+----+---+---------+------+---------------------------+-----------------------+-------------------------------------+------+\n",
+            "only showing top 10 rows\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# PASO 4: Resumen del dataset cargado\n",
+        "# ============================================\n",
+        "\n",
+        "print(\"\\n\" + \"=\" * 60)\n",
+        "print(\"RESUMEN DEL DATASET SIPSA\")\n",
+        "print(\"=\" * 60)\n",
+        "print(f\"Total de registros: {df_sipsa.count():,}\")\n",
+        "print(f\"Total de columnas originales + derivadas: {len(df_sipsa.columns)}\")\n",
+        "\n",
+        "print(\"\\nRango de fechas:\")\n",
+        "df_sipsa.select(\n",
+        "    F.min(\"Fecha_Date\").alias(\"Primera_fecha\"),\n",
+        "    F.max(\"Fecha_Date\").alias(\"Ultima_fecha\")\n",
+        ").show()\n",
+        "\n",
+        "print(\"\\nRegistros por Grupo (top 10):\")\n",
+        "df_sipsa.groupBy(\"Grupo\").count().orderBy(F.desc(\"count\")).show(10, truncate=False)\n",
+        "\n",
+        "print(\"\\nRegistros por Año:\")\n",
+        "df_sipsa.groupBy(\"anio\").count().orderBy(\"anio\").show()\n",
+        "\n",
+        "print(\"\\nEstadísticas del Precio:\")\n",
+        "df_sipsa.select(\"Precio\").summary(\"count\", \"min\", \"25%\", \"50%\", \"75%\", \"max\", \"mean\").show()"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "PknHvaQJvTXt",
+        "outputId": "452dd09e-31ef-4d70-fdc8-0fbb8d976a17"
+      },
+      "execution_count": 21,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\n",
+            "============================================================\n",
+            "RESUMEN DEL DATASET SIPSA\n",
+            "============================================================\n",
+            "Total de registros: 281,386\n",
+            "Total de columnas originales + derivadas: 12\n",
+            "\n",
+            "Rango de fechas:\n",
+            "+-------------+------------+\n",
+            "|Primera_fecha|Ultima_fecha|\n",
+            "+-------------+------------+\n",
+            "|   2013-01-01|  2017-12-01|\n",
+            "+-------------+------------+\n",
+            "\n",
+            "\n",
+            "Registros por Grupo (top 10):\n",
+            "+-----------------------------+-----+\n",
+            "|Grupo                        |count|\n",
+            "+-----------------------------+-----+\n",
+            "|FRUTAS                       |71589|\n",
+            "|VERDURAS Y HORTALIZAS        |56945|\n",
+            "|CARNES                       |45078|\n",
+            "|PROCESADOS                   |40197|\n",
+            "|TUBERCULOS, RAICES Y PLATANOS|23121|\n",
+            "|GRANOS Y CEREALES            |18463|\n",
+            "|PESCADOS                     |13407|\n",
+            "|LACTEOS Y HUEVOS             |12586|\n",
+            "+-----------------------------+-----+\n",
+            "\n",
+            "\n",
+            "Registros por Año:\n",
+            "+----+-----+\n",
+            "|anio|count|\n",
+            "+----+-----+\n",
+            "|2013|54676|\n",
+            "|2014|56334|\n",
+            "|2015|55958|\n",
+            "|2016|57026|\n",
+            "|2017|57392|\n",
+            "+----+-----+\n",
+            "\n",
+            "\n",
+            "Estadísticas del Precio:\n",
+            "+-------+-----------------+\n",
+            "|summary|           Precio|\n",
+            "+-------+-----------------+\n",
+            "|  count|           281386|\n",
+            "|    min|               82|\n",
+            "|    25%|             1194|\n",
+            "|    50%|             2490|\n",
+            "|    75%|             7177|\n",
+            "|    max|            89556|\n",
+            "|   mean|5244.314511027556|\n",
+            "+-------+-----------------+\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ============================================\n",
+        "# CELDA: Configurar Git en Colab\n",
+        "# ============================================\n",
+        "!git config --global user.email \"camilo.usta02@gmail.com\"\n",
+        "!git config --global user.name \"camilousta02-crypto\"\n",
+        "\n",
+        "# Clonar tu repositorio\n",
+        "!git clone https://github.com/camilousta02-crypto/proyecto_final_Velandia_Camilo.git\n",
+        "%cd proyecto_final_Velandia_Camilo"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Nv2rWd54h8hn",
+        "outputId": "ade640f8-b61c-4d29-e5b5-079b2bfee085"
+      },
+      "execution_count": 9,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "fatal: destination path 'proyecto_final_Velandia_Camilo' already exists and is not an empty directory.\n",
+            "/content/proyecto_final_Velandia_Camilo\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
