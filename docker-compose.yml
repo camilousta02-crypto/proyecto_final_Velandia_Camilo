@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: sipsa_ml_velandia
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./bloque1_eda:/home/jovyan/bloque1_eda
+      - ./bloque2_ml:/home/jovyan/bloque2_ml
+      - ./bloque3_nlp:/home/jovyan/bloque3_nlp
+      - ./reporte_ejecutivo.pdf:/home/jovyan/reporte_ejecutivo.pdf
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=sipsa2026
