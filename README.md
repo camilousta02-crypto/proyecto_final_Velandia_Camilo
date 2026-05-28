@@ -1,7 +1,7 @@
 # Proyecto Final: Machine Learning con PySpark y Docker
 ## Universidad Santo Tomás - Programa de Estadística
 
-**Estudiante:** Camilo Velandia
+**Estudiante:** Camilo Andrés Velandia Suarez
 
 **Dataset:** SIPSA Precios Mayoristas (P-Mensual 2013-2017) - DANE
 
